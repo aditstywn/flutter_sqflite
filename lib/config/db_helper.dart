@@ -1,3 +1,4 @@
+import 'package:flutter_dblocal_sqflite/models/category_model.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../models/product_model.dart';
@@ -7,8 +8,15 @@ class DbHelper {
 
   Future<void> _createDB(Database db, int version) async {
     await db.execute('''
+      CREATE TABLE category(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL
+      )
+      ''');
+    await db.execute('''
     CREATE TABLE product(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id_category INTEGER REFERENCES category(id) ON DELETE SET NULL,
       name TEXT ,
       price INTEGER ,
       stock INTEGER,
@@ -27,6 +35,58 @@ class DbHelper {
     _database ??= await _initDB('product.db');
     return _database!;
   }
+
+  // category
+  Future<int> insertCategory(CategoryModel category) async {
+    final db = await getDB;
+    try {
+      return await db.insert('category', category.toMap());
+    } catch (e) {
+      throw Exception('Gagal menambahkan kategori: $e');
+    }
+  }
+
+  Future<List<CategoryModel>> getCategories() async {
+    final db = await getDB;
+    try {
+      final List<Map<String, dynamic>> results = await db.query(
+        'category',
+        orderBy: 'id DESC',
+      );
+      return results.map((res) => CategoryModel.fromMap(res)).toList();
+    } catch (e) {
+      throw Exception('Gagal mendapatkan kategori: $e');
+    }
+  }
+
+  Future<List<CategoryModel>> getCategoryById(int id) async {
+    final db = await getDB;
+    try {
+      final List<Map<String, dynamic>> results = await db.query(
+        'category',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      return results.map((res) => CategoryModel.fromMap(res)).toList();
+    } catch (e) {
+      throw Exception('Gagal mendapatkan kategori: $e');
+    }
+  }
+
+  Future<int> deleteCategory(CategoryModel category) async {
+    final db = await getDB;
+    try {
+      return await db.delete(
+        'category',
+        where: 'id = ?',
+        whereArgs: [category.id],
+      );
+    } catch (e) {
+      throw Exception('Gagal menghapus kategori: $e');
+    }
+  }
+
+  // product
 
   Future<int> insert(ProductModel product) async {
     final db = await getDB;
@@ -64,7 +124,7 @@ class DbHelper {
     }
   }
 
-  Future<int> delete(ProductModel product) async {
+  Future<int> deleteProduct(ProductModel product) async {
     final db = await getDB;
     try {
       return await db.delete(

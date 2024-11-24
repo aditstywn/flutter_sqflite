@@ -1,16 +1,24 @@
+// ignore_for_file: public_member_api_docs, sort_constructors_first
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_dblocal_sqflite/models/product_model.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../config/db_helper.dart';
-import 'home_page.dart';
+import 'package:flutter_dblocal_sqflite/models/product_model.dart';
+import 'package:flutter_dblocal_sqflite/presentation/setting/pages/product/product_page.dart';
+
+import '../../../../config/db_helper.dart';
+import '../../widgets/dropDown_model.dart';
 
 class EditPage extends StatefulWidget {
   final ProductModel product;
-  const EditPage({super.key, required this.product});
+  final String? categoryName;
+  const EditPage({
+    super.key,
+    required this.product,
+    this.categoryName,
+  });
 
   @override
   State<EditPage> createState() => _EditPageState();
@@ -21,16 +29,20 @@ class _EditPageState extends State<EditPage> {
   final _priceController = TextEditingController();
   final _stockController = TextEditingController();
   Uint8List? _imageBase64;
+  String? selectedCategory;
 
   @override
   void initState() {
     _nameController.text = widget.product.name;
     _priceController.text = widget.product.price.toString();
     _stockController.text = widget.product.stock.toString();
+    selectedCategory = widget.product.id_category.toString();
 
     if (widget.product.image != null) {
       _imageBase64 = widget.product.image!;
     }
+
+    loadCategories();
 
     super.initState();
   }
@@ -44,6 +56,25 @@ class _EditPageState extends State<EditPage> {
       setState(() {
         _imageBase64 = bytes;
       });
+    }
+  }
+
+  List<DropdownModel> categories = [];
+
+  Future<void> loadCategories() async {
+    try {
+      final categoryList = await DbHelper().getCategories();
+      setState(() {
+        categories = categoryList
+            .map((category) => DropdownModel(
+                  name: category.name!,
+                  value: category.id.toString(),
+                ))
+            .toList();
+      });
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error loading categories: $e');
     }
   }
 
@@ -132,10 +163,42 @@ class _EditPageState extends State<EditPage> {
             ),
           ),
           const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            hint: selectedCategory == null
+                ? const Text('Category')
+                : widget.categoryName == null
+                    ? const Text('Category')
+                    : Text(widget.categoryName!),
+            items: categories.map((DropdownModel category) {
+              return DropdownMenuItem<String>(
+                value: category.value,
+                child: Text(category.name),
+              );
+            }).toList(),
+            onChanged: (String? value) {
+              setState(() {
+                selectedCategory = value;
+              });
+            },
+            decoration: InputDecoration(
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16.0),
+                borderSide: const BorderSide(color: Colors.grey),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16.0),
+                borderSide: const BorderSide(color: Colors.grey),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           ElevatedButton(
             onPressed: () async {
               final product = ProductModel(
                 id: widget.product.id,
+                id_category: selectedCategory != null
+                    ? int.tryParse(selectedCategory!)
+                    : null,
                 name: _nameController.text,
                 price: int.parse(_priceController.text),
                 stock: int.parse(_stockController.text),
@@ -152,8 +215,11 @@ class _EditPageState extends State<EditPage> {
                 ));
 
                 // ignore: use_build_context_synchronously
-                Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (context) => const HomePage()));
+                Navigator.pushReplacement(
+                    // ignore: use_build_context_synchronously
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const ProductPage()));
               } else {
                 // ignore: use_build_context_synchronously
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(

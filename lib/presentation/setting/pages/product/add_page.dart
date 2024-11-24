@@ -2,10 +2,12 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_dblocal_sqflite/config/db_helper.dart';
-import 'package:flutter_dblocal_sqflite/models/product_model.dart';
-import 'package:flutter_dblocal_sqflite/pages/home_page.dart';
+import '../../../../config/db_helper.dart';
+import '../../../../models/product_model.dart';
+import 'product_page.dart';
 import 'package:image_picker/image_picker.dart';
+
+import '../../widgets/dropDown_model.dart';
 
 class AddPage extends StatefulWidget {
   const AddPage({super.key});
@@ -21,6 +23,31 @@ class _AddPageState extends State<AddPage> {
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _stockController = TextEditingController();
   Uint8List? _imageBase64;
+
+  String? selectedCategory;
+  List<DropdownModel> categories = [];
+
+  @override
+  void initState() {
+    super.initState();
+    loadCategories();
+  }
+
+  Future<void> loadCategories() async {
+    try {
+      final categoryList = await DbHelper().getCategories();
+      setState(() {
+        categories = categoryList
+            .map((category) => DropdownModel(
+                  name: category.name!,
+                  value: category.id.toString(),
+                ))
+            .toList();
+      });
+    } catch (e) {
+      print('Error loading categories: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -130,11 +157,38 @@ class _AddPageState extends State<AddPage> {
                 },
               ),
               const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                hint: const Text('Category'),
+                items: categories.map((DropdownModel category) {
+                  return DropdownMenuItem<String>(
+                    value: category.value,
+                    child: Text(category.name),
+                  );
+                }).toList(),
+                onChanged: (String? value) {
+                  setState(() {
+                    selectedCategory = value;
+                  });
+                },
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16.0),
+                    borderSide: const BorderSide(color: Colors.grey),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16.0),
+                    borderSide: const BorderSide(color: Colors.grey),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () async {
-                  // Periksa validasi form sebelum melanjutkan
                   if (_formkey.currentState?.validate() ?? false) {
                     final product = ProductModel(
+                      id_category: selectedCategory != null
+                          ? int.parse(selectedCategory!)
+                          : null,
                       name: _nameController.text,
                       price: int.parse(_priceController.text),
                       stock: int.parse(_stockController.text),
@@ -144,7 +198,6 @@ class _AddPageState extends State<AddPage> {
                     final response = await DbHelper().insert(product);
 
                     if (response > 0) {
-                      // ignore: use_build_context_synchronously
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           backgroundColor: Colors.green,
@@ -159,13 +212,11 @@ class _AddPageState extends State<AddPage> {
                         _imageBase64 = null;
                       });
 
-                      // ignore: use_build_context_synchronously
                       Navigator.pushReplacement(context,
                           MaterialPageRoute(builder: (context) {
-                        return const HomePage();
+                        return const ProductPage();
                       }));
                     } else {
-                      // ignore: use_build_context_synchronously
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           backgroundColor: Colors.red,
